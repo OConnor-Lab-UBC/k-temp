@@ -26,6 +26,7 @@ chlamy_summaries %>%
 	ggplot(., aes(x = dataset, y = cell_count)) + geom_bar(stat= "identity") + theme(axis.text.x = element_text(size = 20, angle = 90, hjust = 1))
 	
 
+unique(chlamy_summaries$dataset)
 
-
-# separate(chlamy_summaries, dataset, c("name", "replicate", "temperature", "date", "type"), extra = "drop",  sep = ".") %>% View
+chlamy_separated <- chlamy_summaries %>% 
+separate(chlamy_summaries, dataset, c("name", "replicate", "temperature", "date", "type"),  extra = "drop")
