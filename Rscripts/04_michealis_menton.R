@@ -3,6 +3,9 @@
 #### Trying to fit a Michaelis Mentenn function
 
 library(drc)
+library(dplyr)
+library(readr)
+library(ggplot2)
 
 data <- read_csv("data/ChlamyKtemp_aftersorting.csv")
 

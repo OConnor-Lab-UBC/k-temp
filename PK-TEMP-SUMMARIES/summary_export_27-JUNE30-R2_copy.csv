@@ -1,0 +1,26 @@
+List File,27-JUNE30-R2_copy.lst
+Start Time,2016-06-30  15:39:36
+Sampling Time,50 sec
+
+Count,103  of  103
+Particles / ml,4584
+
+Droplet mg/L,NA
+Solids mg/L,NA
+
+Efficiency,10.9%
+PPI,NA
+
+Summary Stats,Mean,Min,Max,StdDev,% CV
+
+Filter,Count,Count %,Volume %,P/ML,PPM
+
+Particle Segmentation,Dark Threshold 20.00  Light Threshold 20.00
+Distance to Nearest Neighbor,0 microns
+Close Holes,1 iterations
+Basic Size Filter,Diameter (ABD) Min 5.00  Max 10000.00  microns
+Advanced Filter,None
+AutoImage Frame Rate,12 frames per second
+Flash Duration,25.00 microseconds
+Camera Gain,0
+

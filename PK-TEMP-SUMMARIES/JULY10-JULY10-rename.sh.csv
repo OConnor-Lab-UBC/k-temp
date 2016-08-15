@@ -1,0 +1,6 @@
+for file_name in *
+do
+
+cp $file_name  JULY10-"$file_name".csv
+
+done

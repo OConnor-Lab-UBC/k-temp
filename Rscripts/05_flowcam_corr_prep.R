@@ -15,7 +15,7 @@ library(lubridate)
 
 ## step 1b, read in UniqueID key
 
-Unique_ID_key <- read_csv("/Users/Joey/Documents/chlamy-ktemp/k-temp/data-raw/PK-temp-UniqueID-key.csv")
+Unique_ID_key <- read.csv("/Users/Joey/Documents/chlamy-ktemp/k-temp/data-raw/PK-temp-UniqueID-key.csv")
 
 #### Step 2: create a list of file names for each of the summaries ####
 fnams <- list.files("/Users/Joey/Documents/chlamy-ktemp/k-temp/PK-TEMP-SUMMARIES", full.names = TRUE) ## find out the names of all the files in data-summary, use full.names to get the relative path for each file
@@ -36,7 +36,8 @@ ptemp_summaries <- fnams %>%
 	
 ptemp_sep<- separate(ptemp_summaries, dataset, c("replicate", "date", "copy"), extra = "drop") %>% 
 	select(-copy) %>%
-	separate(replicate, c("x", "Unique_ID"), sep = 1) %>% 
+	filter(start_time != "do") %>%
+	separate(replicate, c("x", "Unique_ID"), sep = 1) %>%
 	select(-x)
 
 glimpse(ptemp_sep) ## eesh we notice that the date is not in the right format!
@@ -49,14 +50,210 @@ glimpse(ptemp_sep)
 ### now join with the UniqueID key
 ptemp_sep$Unique_ID <- as.character(ptemp_sep$Unique_ID)
 Unique_ID_key$Unique_ID <- as.character(Unique_ID_key$Unique_ID)
+Unique_ID_key$unique_number <- as.numeric(rownames(Unique_ID_key))
+
 
 length(unique(Unique_ID_key$Unique_ID))
 length(unique(ptemp_sep$Unique_ID))
 
 ptemp_all <- left_join(ptemp_sep, Unique_ID_key)
 
+glimpse(ptemp_all)
+
+?lubridate
+??duration
+
+
+
 ptemp_all %>% 
-	group_by(Unique_ID) %>% 
-ggplot(data = ., aes(x = start_time, y = log(cell_count), color = factor(temperature))) + geom_point()
+	mutate(time_since_innoc = duration(start_time, ymd_hms(2016-06-30 14:15:43))) %>% View
+
+ptemp_all$start.time <- ymd_hms("2016-06-30 14:15:43")
+
+str(ptemp_all)
+
+?difftime
+
+ptemp_all$time_since_innoc <- interval(ptemp_all$start.time, ptemp_all$start_time)
+
+
+ptemp_all_2 <- ptemp_all %>% 
+	mutate(time_since_innoc_days = time_since_innoc/ddays(1)) %>% 
+	mutate(time_since_innoc_hours = time_since_innoc/dhours(1))
+
+
+ptemp_all_2 %>% 
+	mutate(P = as.factor(P.treatment)) %>% 
+	# filter(P.treatment == "FULL") %>% 
+	filter(unique_number < 51) %>% 
+	filter(temperature == 24) %>% 
+	filter(time_since_innoc_days < 5) %>%
+	ggplot(data = ., aes(x = time_since_innoc_days, y = cell_count, group = Unique_ID)) + geom_point(size = 4) +
+	scale_y_log10() +
+	theme_bw()
+	
+library(broom)
+ptemp_all_2 %>% 
+	mutate(P = as.factor(P.treatment)) %>% 
+	# filter(P.treatment == "FULL") %>% 
+	filter(unique_number < 51) %>% 
+	filter(temperature == 24 | time_since_innoc_hours < 100) %>%
+	filter(temperature == 20 | time_since_innoc_hours < 200) %>%
+	filter(temperature == 16 | time_since_innoc_hours < 250) %>%
+	filter(temperature == 12 | time_since_innoc_hours < 1000) %>%
+	filter(temperature == 8 | time_since_innoc_hours < 1000) %>%
+	group_by(temperature) %>% 
+	do(tidy(lm(log(cell_count) ~ time_since_innoc_days, data = .), conf.int = TRUE)) %>%
+	filter(term != "(Intercept)") %>% View
+
+
+
+
+
+r.24 <- ptemp_all_2 %>% 
+	mutate(P = as.factor(P.treatment)) %>% 
+	# filter(P.treatment == "FULL") %>% 
+	filter(unique_number < 51) %>% 
+	filter(temperature == 24) %>% 
+	filter(time_since_innoc_hours < 100) %>% 
+	group_by(P) %>% 
+	do(tidy(lm(log(cell_count) ~ time_since_innoc_days, data = .), conf.int = TRUE)) 
+
+
+r.20 <- ptemp_all_2 %>% 
+	mutate(P = as.factor(P.treatment)) %>% 
+	# filter(P.treatment == "FULL") %>% 
+	filter(unique_number < 51) %>% 
+	filter(temperature == 20) %>% 
+	filter(time_since_innoc_hours < 200) %>% 
+	group_by(P) %>% 
+	do(tidy(lm(log(cell_count) ~ time_since_innoc_days, data = .), conf.int = TRUE)) 
+
+r.16 <- ptemp_all_2 %>% 
+	mutate(P = as.factor(P.treatment)) %>% 
+	# filter(P.treatment == "FULL") %>% 
+	filter(unique_number < 51) %>% 
+	filter(temperature == 16) %>% 
+	filter(time_since_innoc_hours < 250) %>% 
+	group_by(P) %>% 
+	do(tidy(lm(log(cell_count) ~ time_since_innoc_days, data = .), conf.int = TRUE)) 
+
+
+r.12 <- ptemp_all_2 %>% 
+	mutate(P = as.factor(P.treatment)) %>% 
+	# filter(P.treatment == "FULL") %>% 
+	filter(unique_number < 51) %>% 
+	filter(temperature == 12) %>% 
+	group_by(P) %>% 
+	# filter(time_since_innoc_hours < 250) %>% 
+	do(tidy(lm(log(cell_count) ~ time_since_innoc_days, data = .), conf.int = TRUE)) 
+
+r.8 <- ptemp_all_2 %>% 
+	mutate(P = as.factor(P.treatment)) %>% 
+	# filter(P.treatment == "FULL") %>% 
+	filter(unique_number < 51) %>% 
+	filter(temperature == 8) %>% 
+	group_by(P) %>% 
+	# filter(time_since_innoc_hours < 250) %>% 
+	do(tidy(lm(log(cell_count) ~ time_since_innoc_days, data = .), conf.int = TRUE))
+
+r.24$temperature <- 24
+r.20$temperature <- 20
+r.16$temperature <- 16
+r.12$temperature <- 12
+r.8$temperature <- 8
+
+r.all <- bind_rows(r.24, r.20, r.16, r.12, r.8) %>% 
+	filter(term != "(Intercept)")
+
+ggplot(data = r.all, aes(x = temperature, y = estimate, group = P, color = P)) + geom_point(size = 10) +
+	geom_errorbar(aes(ymin = conf.low, ymax = conf.high, width = 1)) + ylab("intrinsic growth rate, r") + xlab("temperature, C") +
+	theme_bw() +
+	theme(
+		# panel.border = element_blank(),
+		# legend.key = element_blank(),
+		# axis.ticks = element_blank(),
+		# axis.text.y = element_blank(),
+		# axis.text.x = element_blank(),
+		# panel.grid = element_blank(),
+		panel.grid.minor = element_blank(), 
+		panel.grid.major = element_blank(),
+		panel.background = element_blank(),
+		plot.background = element_rect(fill = "transparent",colour = NA)) + 
+	theme(axis.text=element_text(size=24),
+				axis.title=element_text(size=20,face="bold"))
+
+ggsave("test.png", bg = "transparent")
+
+
+
+
+
+
+
+	ptemp_all_2 %>% 
+	mutate(P = as.factor(P.treatment)) %>% 
+		# filter(P.treatment == "FULL") %>% 
+		filter(temperature == 16) %>% 
+		filter(unique_number < 51) %>%
+	ggplot(data = ., aes(x = time_since_innoc_hours, y = cell_count, color = factor(temperature), group = Unique_ID)) + geom_point(size = 4) +
+		geom_line(aes(linetype = P), size = 1.5) +
+		scale_y_log10() +
+		ylab("log abundance") + xlab("Time, hours") +
+		theme_bw() +
+		theme(
+			axis.ticks = element_line(color = "white"),
+			panel.grid.minor = element_blank(), 
+			panel.grid.major = element_blank(),
+			panel.background = element_blank(),
+			panel.border = element_rect(color = "white"),
+			plot.background = element_rect(fill = "transparent",colour = NA)) + 
+		theme(legend.background = element_rect(fill = "transparent"), legend.margin = unit(1, "cm")) +
+		theme(legend.text = element_text(size = 20, colour = "white")) +
+		theme(axis.text.x=element_text(size=30, color = "white"),
+					axis.text.y=element_text(size=30, color = "white"),
+					axis.title=element_text(size=30,face="bold", color = "white"),
+					legend.key = element_rect(fill = "transparent", colour = "transparent")) +
+		theme(legend.position="top") + 
+		theme(legend.title=element_blank())
+	
+	ggsave("growth_curves.png", bg = "transparent", width = 8, height = 8)
+	
+	
+	
+	P.temp16 <- ptemp_all_2 %>% 
+		mutate(P = as.factor(P.treatment)) %>% 
+		# filter(P.treatment == "FULL") %>% 
+		filter(temperature == 16)
+	
+	levels(P.temp16$P.treatment)[levels(P.temp16$P.treatment) == "DEF"] <- "Nutrient limited"
+	levels(P.temp16$P.treatment)[levels(P.temp16$P.treatment) == "FULL"] <- "Nutrient replete"
 	
 
+	
+	
+	P.temp16 %>% 
+	ggplot(data = ., aes(x = time_since_innoc_hours, y = cell_count, color = P.treatment, group = Unique_ID)) + geom_point(size = 4) +
+		geom_line(size = 1.5) +
+		scale_colour_manual(values= c("darkolivegreen3", "cadetblue2")) + 
+		scale_y_log10() +
+		ylab("log abundance") + xlab("Time, hours") +
+		theme_bw() +
+		theme(
+			axis.ticks = element_line(color = "white"),
+			panel.grid.minor = element_blank(), 
+			panel.grid.major = element_blank(),
+			panel.background = element_blank(),
+			panel.border = element_rect(color = "white"),
+			plot.background = element_rect(fill = "transparent",colour = NA)) + 
+		theme(legend.background = element_rect(fill = "transparent"), legend.margin = unit(1, "cm")) +
+		theme(legend.text = element_text(size = 20, colour = "white")) +
+		theme(axis.text.x=element_text(size=30, color = "white"),
+					axis.text.y=element_text(size=30, color = "white"),
+					axis.title=element_text(size=30,face="bold", color = "white"),
+					legend.key = element_rect(fill = "transparent", colour = "transparent")) +
+		theme(legend.position="top") + 
+		theme(legend.title=element_blank())
+	
+	ggsave("carrying_capacity_16.png", bg = "transparent", width = 8, height = 8)
+	

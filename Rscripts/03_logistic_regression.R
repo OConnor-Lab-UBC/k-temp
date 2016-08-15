@@ -58,11 +58,29 @@ data %>%
 	filter(day > 25) %>% 
 	group_by(temperature, replicate) %>% 
 	summarise(mean.k = mean(log(density))) %>%
-	ggplot(data = ., aes(x = temperature, y = mean.k)) + geom_point() +
-	geom_smooth(method = "lm") +
-	geom_point(size = 3) + theme_bw() + ylab("carrying capacity, K, log cell density") + xlab("temperature, C") +
-	theme(axis.text=element_text(size=16),
-				axis.title=element_text(size=16,face="bold"))
+	ggplot(data = ., aes(x = temperature, y = mean.k)) + geom_point(color = "cadetblue2", size = 4) +
+	geom_smooth(method = "lm", color = "cadetblue2", size = 2) +
+	 ylab("K, log abundance") + xlab("temperature, C") +
+	theme_bw() +
+	theme(
+		axis.ticks = element_line(color = "white"),
+		panel.grid.minor = element_blank(), 
+		panel.grid.major = element_blank(),
+		panel.background = element_blank(),
+		panel.border = element_rect(color = "white"),
+		plot.background = element_rect(fill = "transparent",colour = NA)) + 
+	theme(legend.background = element_rect(fill = "transparent"), legend.margin = unit(1, "cm")) +
+	theme(legend.text = element_text(size = 20, colour = "white")) +
+	theme(axis.text.x=element_text(size=30, color = "white"),
+				axis.text.y=element_text(size=30, color = "white"),
+				axis.title=element_text(size=30,face="bold", color = "white"),
+				legend.key = element_rect(fill = "transparent", colour = "transparent")) +
+	theme(legend.position="top") + 
+	theme(legend.title=element_blank())
+
+ggsave("carrying_capacity_K.png", bg = "transparent", width = 8, height = 7)
+
+
 						
 						
 						
