@@ -1,6 +1,0 @@
-for file_name in *
-do
-
-cp $file_name  JULY18-"$file_name".csv
-
-done

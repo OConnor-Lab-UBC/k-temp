@@ -7,6 +7,7 @@ library(dplyr)
 library(purrr)
 library(ggplot2)
 library(lubridate)
+library(stringr)
 
 
 #### Step 1 #### 
@@ -19,26 +20,73 @@ Unique_ID_key <- read.csv("/Users/Joey/Documents/chlamy-ktemp/k-temp/data-raw/PK
 
 #### Step 2: create a list of file names for each of the summaries ####
 fnams <- list.files("/Users/Joey/Documents/chlamy-ktemp/k-temp/PK-TEMP-SUMMARIES", full.names = TRUE) ## find out the names of all the files in data-summary, use full.names to get the relative path for each file
+# fnams <- list.files("/Users/Joey/Documents/chlamy-ktemp/k-temp/AUG13-summaries", full.names = TRUE) ## find out the names of all the files in data-summary, use full.names to get the relative path for each file
+
 fnams
+
+fnams_no_copy <- fnams[!str_detect(fnams, "copy")]
+fnams_no_copy <- fnams_no_copy[!str_detect(fnams_no_copy, "/Users/Joey/Documents/chlamy-ktemp/k-temp/PK-TEMP-SUMMARIES/10_summary.csv")]
+
+
+
+# fnams_no_copy <- fnams_no_copy[!str_subset(fnams_no_copy, "/Users/Joey/Documents/chlamy-ktemp/k-temp/PK-TEMP-SUMMARIES/1-R2_copy.csv")]
+# fnams_no_copy <- fnams_no_copy[!str_detect(fnams_no_copy, "NA")]
+# fnams_no_copy <- fnams[1:612] ## for some reason there's a bunch of NAs here, so I'm eliminating them
+
+## weirdo files:
+1-R2_copy.csv
+2-R2_copy.csv
+6_copy
+8_copy
+21_copy
+27_copy
+36_copy
+23_R3_copy
+37_copy
+38_copy
+39_copy
+44_copy
+45_copy
+46_copy
+47_copy
+48_copy
+49-R2_copy
+50_copy
+
+ptemp_summaries[[165]]
+?read.csv
 #### Step 3: create a df with the dataset ID and the cell count ####
-ptemp_summaries <- fnams %>%  
-	lapply(FUN = function(p) read.csv(p, nrows = 6)) %>% 
+ptemp_summaries <- fnams_no_copy %>%  
+	lapply(FUN = function(p) read.csv(p, nrows = 4)) %>% 
 	as.data.frame(.) %>%
 	mutate(List.File = as.character(List.File)) %>% 
 	filter(List.File == "Particles / ml" | List.File == "Start Time") %>% 
+	# filter(List.File %in% c("Particles / ml", "Start Time", "Volume (ABD)")) %>%
 	select(- starts_with("List")) %>% 
-	t(.) %>%
-	as.data.frame() %>%
+	t(.) %>% 
+	as.data.frame() %>% 
 	mutate(dataset = rownames(.)) %>%
 	rename(start_time = V1,
 				 cell_count = V2) %>% 
-	mutate(cell_count = as.numeric(as.character(cell_count))) 
+	mutate(cell_count = as.numeric(as.character(cell_count)))
 	
+
+#### Step 3 -- messing around with the data import code b/c some of the files don't want to load properly!
+# file_list <- fnams_no_copy %>%
+# 	map(read_csv, n_max = 4) %>% 
+# 	map_df( ~ tibble()) %>% View
+# 	as.data.frame()
+# 	map(.f = filter_(.$`List File` == "Count"))
+# 	glimpse(file_list)
+# file_list[[12]]
+
 ptemp_sep<- separate(ptemp_summaries, dataset, c("replicate", "date", "copy"), extra = "drop") %>% 
-	select(-copy) %>%
+	select(-copy) %>% 
 	filter(start_time != "do") %>%
 	separate(replicate, c("x", "Unique_ID"), sep = 1) %>%
-	select(-x)
+	select(-x) 
+
+fnams
 
 glimpse(ptemp_sep) ## eesh we notice that the date is not in the right format!
 
@@ -65,32 +113,57 @@ glimpse(ptemp_all)
 
 
 
-ptemp_all %>% 
-	mutate(time_since_innoc = duration(start_time, ymd_hms(2016-06-30 14:15:43))) %>% View
+# ptemp_all %>% 
+# 	mutate(time_since_innoc = duration(start_time, ymd_hms(2016-06-30 14:15:43))) %>% View
 
 ptemp_all$start.time <- ymd_hms("2016-06-30 14:15:43")
-
-str(ptemp_all)
-
-?difftime
 
 ptemp_all$time_since_innoc <- interval(ptemp_all$start.time, ptemp_all$start_time)
 
 
 ptemp_all_2 <- ptemp_all %>% 
 	mutate(time_since_innoc_days = time_since_innoc/ddays(1)) %>% 
-	mutate(time_since_innoc_hours = time_since_innoc/dhours(1))
+	mutate(time_since_innoc_hours = time_since_innoc/dhours(1)) %>% 
+	mutate(total_biovolume = cell_count * biovolume)
 
+
+write_csv(ptemp_all_2, "data/ptemp_all_2.csv")
 
 ptemp_all_2 %>% 
 	mutate(P = as.factor(P.treatment)) %>% 
 	# filter(P.treatment == "FULL") %>% 
-	filter(unique_number < 51) %>% 
-	filter(temperature == 24) %>% 
-	filter(time_since_innoc_days < 5) %>%
-	ggplot(data = ., aes(x = time_since_innoc_days, y = cell_count, group = Unique_ID)) + geom_point(size = 4) +
+	# filter(unique_number < 51) %>% 
+	# filter(temperature == 24) %>% 
+	# filter(time_since_innoc_days > 40) %>%
+	ggplot(data = ., aes(x = time_since_innoc_days, y = total_biovolume, color = factor(temperature))) + geom_point(size = 4) +
 	scale_y_log10() +
 	theme_bw()
+
+
+library(plotrix)
+
+ptemp_all_2 %>% 
+	mutate(day = day(start_time),
+				 month = month(start_time),
+				 year = year(start_time)) %>%
+	unite(month_day, month, day, year) %>% 
+	group_by(month_day, P.treatment, temperature) %>% 
+	filter(unique_number < 51) %>% 
+	summarize_each(funs(mean, std.error), cell_count) %>%
+	mutate(month_date = mdy(month_day)) %>%
+	group_by(temperature, P.treatment) %>%
+	filter(!is.na(P.treatment)) %>%
+	ggplot(data = ., aes(x = month_date, y = mean, color = factor(temperature))) + geom_point(aes(shape = P.treatment), size = 4) +
+	geom_errorbar(aes(ymin = mean - std.error, ymax= mean + std.error)) + 
+scale_y_log10() +
+	theme_bw() +
+	geom_l
+
+ine(aes(linetype = P.treatment), size = 1.5) + xlab("date") + ylab("log(abundance)") +
+	facet_wrap( ~ P.treatment)
+ggsave("figures/log_cell_abundance_vs_time_ktemp.png")
+
+
 	
 library(broom)
 ptemp_all_2 %>% 
