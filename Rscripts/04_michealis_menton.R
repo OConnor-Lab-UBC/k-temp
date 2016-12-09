@@ -55,3 +55,6 @@ ggplot(data.s, aes(x = day, y = density)) +
 	ylab("log cell density") +
 	geom_point(alpha = 1) +
 	geom_line(data = mml, aes(x = day, y = density), colour = "red")
+?separate
+
+
