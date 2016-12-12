@@ -8,6 +8,8 @@ library(plotrix)
 library(purrr)
 library(broom)
 library(gridExtra)
+library(minpack.lm)
+library(growthcurver)
 
 cells <- read_csv("/Users/Joey/Documents/chlamy-ktemp/k-temp/data/ptemp_all_3.csv")
 
@@ -24,14 +26,76 @@ cells_def <- cells %>%
 #### 20C: 1: 9.0273 2: 7.7849305 3., 7.786 4., 7.7903 5: 7.7889
 #### 24C: 1: 7.8077, 2: 7.80, 3: 11.163 4., 3.958391 5., 11.165844
 cells_full %>% 
-	filter(!grepl("B", Unique_ID )) %>% 
-	filter(temperature == 8) %>% 
+	filter(!grepl("B", Unique_ID )) %>%
+	filter(temperature == 8, replicate == 5) %>%
+	group_by(replicate) %>%
+	do(tidy(nlsLM(cell_density ~ Vm * time_since_innoc_days/(K+time_since_innoc_days), data = .,
+							start = list(K = max(.$time_since_innoc_days)/2, Vm = max(.$cell_density))))) %>%
+	filter(term == "Vm") %>%
 	# filter(replicate == 5) %>% 
-	filter(time_since_innoc_days < 17) %>% 
-	group_by(temperature, replicate, Unique_ID) %>% 
-	ggplot(aes(x = time_since_innoc_days, y = cell_density, group = Unique_ID, color = factor(replicate))) + geom_point() +
+	# filter(time_since_innoc_days < 17) %>% 
+	# group_by(temperature, replicate, Unique_ID) %>% 
+	ggplot(aes(x = time_since_innoc_days, y = cell_density, group = Unique_ID, color = factor(temperature))) + geom_point() +
 	geom_line() +
 	theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+### trying growthcurver
+
+## 20, 841569, 762667, 511465, 755810, 755810, 507991
+cells_sub <- cells_full %>% 
+	filter(!grepl("B", Unique_ID )) %>% 
+	filter(temperature == 24, replicate == 3)
+gc_fit <- SummarizeGrowth(cells_sub$time_since_innoc_days, cells_sub$cell_density)
+
+str(gc_fit$vals)
+gc_fit$vals$note
+
+cells_full %>% 
+	filter(!grepl("B", Unique_ID )) %>% 
+	filter(temperature == 8) %>% 
+	split(.$replicate) %>% 
+	map(.x = ., .f = SummarizeGrowth, .$time_since_innoc_days, .$cell_density)
+
+cells_full %>% 
+	filter(!grepl("B", Unique_ID )) %>% 
+	filter(temperature == 8, replicate == 1) %>%
+	do(SummarizeGrowth(.$time_since_innoc_days, .$cell_density))
+	
+	
+cells_8 <- cells_full %>% 
+	filter(!grepl("B", Unique_ID )) %>% 
+	filter(temperature == 8) %>%
+	select(replicate, time_since_innoc_days, cell_density) %>%
+	# mutate(time_since_innoc_days = as.character(time_since_innoc_days)) %>% 
+	mutate(days = time_since_innoc_days %/% 1) %>% 
+	select(-time_since_innoc_days) %>% 
+	distinct(days, replicate, .keep_all = TRUE) %>% 
+	spread(replicate, cell_density) %>% 
+	rename(time = days)
+	
+
+gc_out <- SummarizeGrowthByPlate(cells_8)
+
+cells_24 <- cells_full %>% 
+	filter(!grepl("B", Unique_ID )) %>% 
+	filter(temperature == 24) %>%
+	select(replicate, time_since_innoc_days, cell_density) %>%
+	# mutate(time_since_innoc_days = as.character(time_since_innoc_days)) %>% 
+	mutate(days = time_since_innoc_days %/% 1) %>% 
+	select(-time_since_innoc_days) %>% 
+	distinct(days, replicate, .keep_all = TRUE) %>% 
+	spread(replicate, cell_density) %>% 
+	rename(time = days)
+
+
+gc_out24 <- SummarizeGrowthByPlate(cells_24)
+
+
+
+
+
+View(gc_out)
 
 r8 <- cells_full %>% 
 	 filter(time_since_innoc_days < 16.95) %>% 
