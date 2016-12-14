@@ -257,6 +257,8 @@ growth_rate_def$nutrient_level <- "deficient"
 all_rates <- bind_rows(growth_rate, growth_rate_def)
 write_csv(all_rates, "/Users/Joey/Documents/chlamy-ktemp/k-temp/data/chlamy-ktemp-growth-rates.csv")
 
+all_rates <- read_csv("/Users/Joey/Documents/chlamy-ktemp/k-temp/data/chlamy-ktemp-growth-rates.csv")
+
 unique(all_rates$nutrient_level)
 
 all_rates %>% 
@@ -287,7 +289,7 @@ all_rates %>%
 	mutate(inverse_temp = (-1/(.00008617*(temperature+273.15)))) %>%
 	group_by(nutrient_level) %>% 
 	do(tidy(lm(log(estimate) ~ inverse_temp, data = .), conf.int = TRUE)) %>% 
-	filter(term == "inverse_temp") %>%
+	filter(term == "inverse_temp") %>% View
 	ggplot(data = ., aes(x = nutrient_level, y = estimate)) + geom_point() +
 	geom_errorbar(aes(ymin = conf.low, ymax = conf.high))
 

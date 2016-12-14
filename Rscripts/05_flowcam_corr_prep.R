@@ -128,6 +128,7 @@ ptemp_all_2 <- ptemp_all %>%
 
 
 write_csv(ptemp_all_2, "data/ptemp_all_2.csv")
+ptemp_all_2 <- read.csv( "data/ptemp_all_2.csv")
 
 ptemp_all_2 %>% 
 	mutate(P = as.factor(P.treatment)) %>% 
@@ -157,9 +158,7 @@ ptemp_all_2 %>%
 	geom_errorbar(aes(ymin = mean - std.error, ymax= mean + std.error)) + 
 scale_y_log10() +
 	theme_bw() +
-	geom_l
-
-ine(aes(linetype = P.treatment), size = 1.5) + xlab("date") + ylab("log(abundance)") +
+	geom_line(aes(linetype = P.treatment), size = 1.5) + xlab("date") + ylab("log(abundance)") +
 	facet_wrap( ~ P.treatment)
 ggsave("figures/log_cell_abundance_vs_time_ktemp.png")
 
@@ -291,6 +290,34 @@ ggsave("test.png", bg = "transparent")
 		theme(legend.title=element_blank())
 	
 	ggsave("growth_curves.png", bg = "transparent", width = 8, height = 8)
+	
+	
+	ptemp_all_2 %>%
+		filter(!is.na(temperature)) %>% 
+		mutate(P.treatment = str_replace(P.treatment, "DEF", "low phosphorus")) %>% 
+		mutate(P.treatment = str_replace(P.treatment, "FULL", "high phosphorus")) %>% 
+		mutate(`nutrient level` = as.factor(P.treatment)) %>% 
+		# filter(P.treatment == "FULL") %>% 
+		filter(temperature < 20) %>% 
+		filter(unique_number < 51) %>%
+		ggplot(data = ., aes(x = time_since_innoc_hours, y = cell_count, color = `nutrient level`, group = Unique_ID)) + geom_point(size = 6, alpha = 0.5) +
+		geom_line(size = 1.5) +
+		scale_y_log10() +
+		facet_wrap( ~ temperature) +
+		ylab("log population abundance") + xlab("Time, hours") +
+		theme(axis.text.y   = element_text(size=20),
+					axis.text.x   = element_text(size=20),
+					axis.title.y  = element_text(size=20),
+					axis.title.x  = element_text(size=20),
+					panel.background = element_blank(),
+					panel.grid.major = element_blank(), 
+					panel.grid.minor = element_blank(),
+					axis.line = element_line(colour = "black"),
+					axis.ticks = element_line(size = 1)) +
+		theme(legend.title=element_blank())+
+		theme(legend.text = element_text(size = 16, face = "bold")) +
+		theme(panel.border = element_blank(), axis.line = element_line(colour="black", size=1, lineend="square"))
+	
 	
 	
 	
