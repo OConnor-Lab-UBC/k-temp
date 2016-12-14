@@ -10,6 +10,7 @@ library(broom)
 library(gridExtra)
 library(minpack.lm)
 library(growthcurver)
+library(stringr)
 
 cells <- read_csv("/Users/Joey/Documents/chlamy-ktemp/k-temp/data/ptemp_all_3.csv")
 
@@ -159,7 +160,7 @@ r8 <- cells_full %>%
 all_r <- bind_rows(r8, r12, r16, r20, r24)
 
 all_r %>% 
-	ggplot(aes(x = temperature, y = estimate)) + geom_point()
+	ggplot(aes(x = temperature, y = log(estimate))) + geom_point()
 
 all_r %>% 
 	mutate(inverse_temp = (-1/(.00008617*(temperature+273.15)))) %>%
@@ -256,13 +257,30 @@ growth_rate_def$nutrient_level <- "deficient"
 all_rates <- bind_rows(growth_rate, growth_rate_def)
 write_csv(all_rates, "/Users/Joey/Documents/chlamy-ktemp/k-temp/data/chlamy-ktemp-growth-rates.csv")
 
+unique(all_rates$nutrient_level)
+
 all_rates %>% 
+	mutate(nutrient_level = str_replace(nutrient_level, "deficient", "low phosphorus")) %>% 
+	mutate(nutrient_level = str_replace(nutrient_level, "replete", "high phosphorus")) %>% 
 	mutate(inverse_temp = (1/(.00008617*(temperature+273.15)))) %>%
-	ggplot(data = ., aes(x = inverse_temp, y = log(estimate), group = nutrient_level, color = nutrient_level)) + geom_point() +
+	ggplot(data = ., aes(x = inverse_temp, y = log(estimate), group = nutrient_level, color = nutrient_level)) + geom_point(size = 6, alpha = 0.5) +
 	geom_smooth(method = "lm") +
 	scale_x_reverse() +
 	xlab("inverse temperature (1/kT)") + 
-	ylab("log growth rate")
+	ylab("log population growth rate (r)") + 
+	theme(axis.text.y   = element_text(size=20),
+				axis.text.x   = element_text(size=20),
+				axis.title.y  = element_text(size=20),
+				axis.title.x  = element_text(size=20),
+				panel.background = element_blank(),
+				panel.grid.major = element_blank(), 
+				panel.grid.minor = element_blank(),
+				axis.line = element_line(colour = "black"),
+				axis.ticks = element_line(size = 1)) +
+	theme(legend.title=element_blank())+
+	theme(legend.text = element_text(size = 16, face = "bold")) +
+	theme(panel.border = element_blank(), axis.line = element_line(colour="black", size=1, lineend="square"))
+
 	
 
 all_rates %>% 
