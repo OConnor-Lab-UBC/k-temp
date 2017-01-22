@@ -11,6 +11,7 @@ library(gridExtra)
 library(minpack.lm)
 library(growthcurver)
 library(stringr)
+library(simecol)
 
 cells <- read_csv("/Users/Joey/Documents/chlamy-ktemp/k-temp/data/ptemp_all_3.csv")
 
@@ -293,3 +294,156 @@ all_rates %>%
 	ggplot(data = ., aes(x = nutrient_level, y = estimate)) + geom_point() +
 	geom_errorbar(aes(ymin = conf.low, ymax = conf.high))
 
+	
+	
+
+# trying w/simecol --------------------------------------------------------
+
+full <-	cells_full %>% 
+		filter(!grepl("B", Unique_ID )) %>% 
+		select(Unique_ID, cell_density, start_time, temperature, time_since_innoc_days, replicate) %>% 
+		rename(P = cell_density) %>% 
+		# filter(temperature == 12) %>% 
+		arrange(Unique_ID) %>% 
+		# filter(replicate == 1) %>% 
+		rename(days = time_since_innoc_days) %>% 
+		rename(ID = Unique_ID) %>% 
+		filter(days < 22)
+	
+	
+	controldata <- split(full, f = full$ID)
+	
+# set up models -----------------------------------------------------------
+	
+	
+	Parameters <- c(r = 0.05, K = 10 ^ 5)
+	
+	# Declare the parameters to be used as the bounds for the fitting algorithm
+	LowerBound <- c(r = 0.015, K = 10 ^ 7)
+	UpperBound <- c(r = 2, K = 10 ^ 13) 
+	
+	# Declare the "step size" for the PORT algorithm. 1 / UpperBound is recommended
+	# by the simecol documentation.
+	ParamScaling <- 1 / UpperBound
+	
+	CRmodel <- new("odeModel",
+								 main = function (time, init, parms) {
+								 	with(as.list(c(init, parms)), {
+								 		dp <-  r * P * (1 - (P / K))
+								 		list(c(dp))
+								 	})
+								 },
+								 parms = Parameters, # Trying Joey's empirically estimated parameters here.
+								 times = c(from = 0, to = 22, by = 0.1), # the time interval over which the model will be simulated.
+								 init = c(P = 561731438),
+								 solver = "lsoda" #lsoda will be called with tolerances of 1e-9, as seen directly below. Default tolerances are both 1e-6. Lower is more accurate.
+	)
+	
+	fittedparms <- c("r", "K") # for assigning fitted parameter values to fittedCRmodel
+	
+	controlfit <- function(data){
+		
+		init(CRmodel) <- c(P = data$P[1]) # Set initial model conditions to the biovolume taken from the first measurement day
+		obstime <- data$days # The X values of the observed data points we are fitting our model to
+		yobs <- select(data, P) # The Y values of the observed data points we are fitting our model to
+
+		
+		fittedCRmodel <- fitOdeModel(CRmodel, whichpar = fittedparms, obstime, yobs,
+																 debuglevel = 0, fn = ssqOdeModel,
+																 method = "PORT", lower = LowerBound, upper = UpperBound, scale.par = ParamScaling,
+																 control = list(trace = T)
+		)
+
+		r <- coef(fittedCRmodel)[1]
+		K <- coef(fittedCRmodel)[2]
+		ID <- data$ID[1]
+		output <- data.frame(ID, r, K)
+		return(output)
+	}
+	
+	
+	# plot function -----------------------------------------------------------
+	
+	
+	
+	plotsinglefit <- function(data){
+		
+		init(CRmodel) <- c(P = data$P[1]) # Set initial model conditions to the biovolume taken from the first measurement day
+		obstime <- data$days # The X values of the observed data points we are fitting our model to
+		yobs <- select(data, P) # The Y values of the observed data points we are fitting our model to
+		# parms(CRmodel)[TempName] <- data$temp[1] # Set the temperature parameter in CRmodel to whatever our control replicate used.
+		
+		# Below we fit a CRmodel to the replicate's data. The optimization criterion used here is the minimization of the sum of
+		# squared differences between the experimental data and our modelled data. This
+		# is fairly standard, although alternatives do exist.
+		
+		# The PORT algorithm is employed to perform the model fitting, analogous to O'Connor et al.
+		# "lower" is a vector containing the lower bound constraints
+		# for the parameter values. This may need tweaking.
+		
+		fittedCRmodel <- fitOdeModel(CRmodel, whichpar = fittedparms, obstime, yobs,
+																 debuglevel = 0, fn = ssqOdeModel,
+																 method = "PORT", lower = LowerBound, upper = UpperBound, scale.par = ParamScaling,
+																 control = list(trace = T)
+		)
+		
+		# To display the fitted results we need to create a new OdeModel object. Here
+		# we duplicate CRmodel and then alter it to use our new fitted parameters.
+		plotfittedCRmodel <- CRmodel
+		parms(plotfittedCRmodel)[fittedparms] <- coef(fittedCRmodel)
+		
+		# set model parameters to fitted values and simulate again
+		times(plotfittedCRmodel) <- c(from=0, to=21, by=1)
+		ysim <- out(sim(plotfittedCRmodel, rtol = 1e-9, atol = 1e-9))
+		
+		# Form observed data into a dataframe; the simulated data are already in a dataframe
+		observeddata <- data.frame(obstime, yobs)
+		simulateddata <- ysim
+		
+		# Plot the results of our model fitting.
+		biol_plot <- ggplot() +
+			geom_point(data = observeddata, aes(x = obstime, y = yobs, color = "observed")) + # Observed data are points
+			geom_line(data = simulateddata, aes(x = time, y = P, color = "simulated")) + # Simulated data are in a continuous line
+			labs(x = "Time (days)", y = "Algal Biovolume")
+		
+		# Output the results as a ggplot2 object
+		output <- biol_plot
+		return(output)
+	}
+
+
+
+# fit and plot ------------------------------------------------------------
+	Parameters <- c(r = 0.05, K = 10 ^ 5)
+	
+	# Declare the parameters to be used as the bounds for the fitting algorithm
+	LowerBound <- c(r = 0.05, K = 10 ^ 3)
+	UpperBound <- c(r = 1, K = 10 ^ 7) 
+	
+	# Declare the "step size" for the PORT algorithm. 1 / UpperBound is recommended
+	# by the simecol documentation.
+	ParamScaling <- 1 / UpperBound
+	
+
+	full <-	cells_full %>% 
+		filter(!grepl("B", Unique_ID )) %>% 
+		select(Unique_ID, cell_density, start_time, temperature, time_since_innoc_days, replicate) %>% 
+		rename(P = cell_density) %>% 
+		filter(temperature < 20) %>% 
+		arrange(Unique_ID) %>% 
+		# filter(replicate == 1) %>% 
+		rename(days = time_since_innoc_days) %>% 
+		rename(ID = Unique_ID) %>% 
+		filter(days < 22)
+	
+	
+	controldata <- split(full, f = full$ID)
+		
+output <- controldata %>% 
+		map_df(controlfit)
+	
+	full %>% 
+		filter(ID == 15) %>% 
+		plotsinglefit(.)
+	
+	
