@@ -2,6 +2,7 @@
 #### nov 2 2016
 #### Joey Bernhardt
 #### Nov 11 2016: next steps, get the growth rates for the exponential for each temperature separately depending on the number of days to include before the peak
+#### feb 7 2017: maybe can just get the r's here and not K for all. 
 
 library(tidyverse)
 library(plotrix)
@@ -20,6 +21,18 @@ cells_full <- cells %>%
 
 cells_def <- cells %>% 
 	filter(P.treatment == "DEF") 
+
+
+# make some initial plots -------------------------------------------------
+
+cells %>% 
+	filter(!grepl("B", Unique_ID )) %>%
+	filter(temperature == 8) %>% 
+	group_by(Unique_ID) %>% 
+	ggplot(aes(time_since_innoc_days, y = total_biovolume, group = Unique_ID, color = P.treatment)) + geom_point() +
+	geom_line()
+	
+
 
 #### where do the replicates reach their first peak?
 #### 8C: 1: 16.941, 2: 16.942 3., 16.94326 4., 16.9440856, 5.16.9449
@@ -367,7 +380,8 @@ full <-	cells_full %>%
 	
 	
 	plotsinglefit <- function(data){
-		
+	
+			
 		init(CRmodel) <- c(P = data$P[1]) # Set initial model conditions to the biovolume taken from the first measurement day
 		obstime <- data$days # The X values of the observed data points we are fitting our model to
 		yobs <- select(data, P) # The Y values of the observed data points we are fitting our model to
@@ -417,19 +431,19 @@ full <-	cells_full %>%
 	Parameters <- c(r = 0.05, K = 10 ^ 5)
 	
 	# Declare the parameters to be used as the bounds for the fitting algorithm
-	LowerBound <- c(r = 0.05, K = 10 ^ 3)
-	UpperBound <- c(r = 1, K = 10 ^ 7) 
+	LowerBound <- c(r = 0.02, K = 10 ^ 3)
+	UpperBound <- c(r = 2, K = 10 ^ 6) 
 	
 	# Declare the "step size" for the PORT algorithm. 1 / UpperBound is recommended
 	# by the simecol documentation.
 	ParamScaling <- 1 / UpperBound
 	
 
-	full <-	cells_full %>% 
+	all_cells <-	cells %>% 
 		filter(!grepl("B", Unique_ID )) %>% 
 		select(Unique_ID, cell_density, start_time, temperature, time_since_innoc_days, replicate) %>% 
 		rename(P = cell_density) %>% 
-		filter(temperature < 20) %>% 
+		# filter(temperature == 12) %>% 
 		arrange(Unique_ID) %>% 
 		# filter(replicate == 1) %>% 
 		rename(days = time_since_innoc_days) %>% 
@@ -437,13 +451,25 @@ full <-	cells_full %>%
 		filter(days < 22)
 	
 	
-	controldata <- split(full, f = full$ID)
+	full <-	cells_full %>% 
+		filter(!grepl("B", Unique_ID)) %>% 
+		select(Unique_ID, cell_density, start_time, temperature, time_since_innoc_days, replicate) %>% 
+		rename(P = cell_density) %>% 
+		# filter(temperature < 20) %>% 
+		arrange(Unique_ID) %>% 
+		# filter(replicate == 1) %>% 
+		rename(days = time_since_innoc_days) %>% 
+		rename(ID = Unique_ID) %>% 
+		filter(days < 22)
+	
+	
+	controldata <- split(all_cells, f = all_cells$ID)
 		
 output <- controldata %>% 
 		map_df(controlfit)
 	
 	full %>% 
-		filter(ID == 15) %>% 
+		filter(ID == 45) %>% 
 		plotsinglefit(.)
 	
-	
+	## looks like rep 3 is missing time initial data
